@@ -183,7 +183,14 @@ class EmbeddingModel:
             # 检查CUDA可用性
             try:
                 import torch
-                device = "cuda" if torch.cuda.is_available() else "cpu"
+                if torch.cuda.is_available():
+                    device = "cuda"
+                elif torch.mps.is_available():
+                    device = "mps"
+                elif torch.xpu.is_available():
+                    device = "xpu"
+                else:
+                    device = "cpu"
             except ImportError:
                 device = "cpu"
                 
