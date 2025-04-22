@@ -359,7 +359,7 @@ class MarkdownProcessor:
                 # 处理文档标题
                 if not has_started:
                     result['title'] = title_text
-                    collecting_authors = True
+                    # collecting_authors = True
                     has_started = True
                     continue
                 
