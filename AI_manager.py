@@ -56,6 +56,9 @@ class AIManager(QObject):
 
         # 添加累积响应变量
         self.accumulated_response = ""
+        
+        # 添加TTS启用标志
+        self.tts_enabled = True
     
     def set_data_manager(self, data_manager):
         """设置数据管理器引用"""
@@ -149,6 +152,7 @@ class AIManager(QObject):
         try:
             # 如果已经有正在生成的响应，先取消它
             if self.is_generating_response:
+                print("[AIManager] Cancelling existing response before starting new one")
                 self.cancel_current_response()
             
             # 确保线程不在运行状态
@@ -221,7 +225,7 @@ class AIManager(QObject):
         self.accumulated_response += sentence
         
         # 删除此行，不在AI生成时触发显示
-        # self.ai_sentence_ready.emit(sentence, self.current_request_id)
+        self.ai_sentence_ready.emit(sentence, self.current_request_id)
         
         # 处理滚动信息 - 如果有滚动信息且markdown_view被设置，则执行滚动
         if scroll_info and hasattr(self, 'markdown_view') and self.markdown_view:
@@ -232,6 +236,11 @@ class AIManager(QObject):
 
     def _speak_response(self, text, sentence_id=None, emotion="neutral"):
         """使用TTS朗读文本"""
+        # 如果TTS被禁用，直接返回
+        if not self.tts_enabled:
+            print(f"文字转语音已禁用,跳过请求: {text[:20]}")
+            return
+            
         # 确保有当前请求ID
         if not self.current_request_id:
             return
@@ -429,3 +438,22 @@ class AIManager(QObject):
                 self.markdown_view._scroll_to_matching_content(content, 'title')
             else:
                 self.markdown_view._scroll_to_matching_content(content, 'text')
+
+    def set_tts_enabled(self, enabled: bool):
+        """设置TTS是否启用
+        
+        Args:
+            enabled: True表示启用TTS，False表示禁用TTS
+        """
+        self.tts_enabled = enabled
+        if not enabled:
+            # 如果禁用TTS，停止当前所有播放
+            self.tts_manager.stop_playing()
+
+    def is_tts_enabled(self) -> bool:
+        """获取TTS是否启用
+        
+        Returns:
+            bool: True表示TTS已启用，False表示已禁用
+        """
+        return self.tts_enabled

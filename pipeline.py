@@ -10,6 +10,7 @@ from processor.translate_processor import TranslateProcessor
 from processor.md_restore_processor import RestoreProcessor
 from processor.extra_info_processor import ExtraInfoProcessor
 from processor.rag_processor import RagProcessor
+from processor.md_processor_slides import MarkdownProcessorSlides
 from PyQt6.QtCore import QObject, pyqtSignal
 
 # 配置日志
@@ -60,6 +61,8 @@ class Pipeline(QObject):
         # 初始化处理器
         self.pdf_processor = PDFProcessor()
         self.md_processor = MarkdownProcessor()
+        self.md_processor_original = MarkdownProcessor()
+        self.md_processor_slides = MarkdownProcessorSlides()
         self.json_processor = JsonProcessor()
         self.tiling_processor = TilingProcessor()
         self.translate_processor = TranslateProcessor()
@@ -75,6 +78,42 @@ class Pipeline(QObject):
 
         # 添加跟踪当前处理阶段的属性
         self._current_stage = None
+
+    def _change_md_processor(self, processor: MarkdownProcessor):
+        print("on _change_md_processor")
+        self.md_processor = processor
+        
+    def toggle_md_processor(self, use_slides_processor: bool):
+        """
+        切换Markdown处理器
+        
+        Args:
+            use_slides_processor: True使用幻灯片处理器，False使用标准处理器
+        
+        Returns:
+            bool: 当前使用的是否为幻灯片处理器
+        """
+        print("signal received 切换Markdown处理器")
+        try:
+            if use_slides_processor:
+                self.logger.info("切换到幻灯片处理器")
+                self.md_processor = self.md_processor_slides
+            else:
+                self.logger.info("切换到标准处理器")
+                self.md_processor = self.md_processor_original
+            return self.is_using_slides_processor()
+        except Exception as e:
+            self.logger.error(f"切换Markdown处理器失败: {str(e)}")
+            return self.is_using_slides_processor()
+    
+    def is_using_slides_processor(self) -> bool:
+        """
+        检查当前使用的处理器是否为幻灯片处理器
+        
+        Returns:
+            bool: True表示使用幻灯片处理器，False表示使用标准处理器
+        """
+        return isinstance(self.md_processor, MarkdownProcessorSlides)
 
     def _get_stage_output_path(self, stage: str, paper_dir: Path, paper_name: str) -> Path:
         """
@@ -227,9 +266,11 @@ class Pipeline(QObject):
                 
                 # 执行处理阶段
                 self.logger.info(f"开始运行阶段: {stage}")
+                logger.info(f"\n参数: pdf {pdf_path}\n paper_output_dir {paper_output_dir}\n paper_info {self.paper_info['paper_id']}\n output_paths {output_paths}")
                 stage_output = self.available_stages[stage](
                     pdf_path, paper_output_dir, self.paper_info['paper_id'], output_paths
                 )
+                logger.info(f"阶段{stage},输出: {stage_output}")
                 output_paths[stage] = stage_output
                 self.logger.info(f"阶段 {stage} 完成")
 
@@ -238,6 +279,8 @@ class Pipeline(QObject):
             
             # 如果RAG或MD_RESTORE阶段已完成，更新全局索引
             final_paths = {}
+            
+            logger.info(f"output_paths: {output_paths}")
             
             # 收集最终文件路径
             if 'md_restore' in output_paths:

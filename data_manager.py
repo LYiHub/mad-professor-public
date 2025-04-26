@@ -725,3 +725,22 @@ class DataManager(QObject):
     def set_ai_manager(self, ai_manager):
         """设置AI管理器引用"""
         self.ai_manager = ai_manager
+        
+    def toggle_md_processor(self, use_slides_processor):
+        """
+        切换Markdown处理器类型
+        Args:
+            use_slides_processor: True使用幻灯片处理器，False使用标准处理器
+            
+        Returns:
+            bool: 切换后当前使用的是否为幻灯片处理器
+        """
+        try:
+            # 调用管线的切换方法
+            if hasattr(self, 'pipeline'):
+                result = self.pipeline.toggle_md_processor(use_slides_processor)
+                return result
+            return False
+        except Exception as e:
+            self.loading_error.emit(f"切换Markdown处理器失败: {str(e)}")
+            return False

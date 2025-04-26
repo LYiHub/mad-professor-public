@@ -1,13 +1,12 @@
-import os
-from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, 
-                           QHBoxLayout, QPushButton, QSplitter, 
-                           QLabel, QFrame)
+from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+                            QPushButton, QSplitter, QLabel, QFrame)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 
 from ui.markdown_view import MarkdownView
 from ui.chat_widget import ChatWidget
 from ui.sidebar_widget import SidebarWidget
+from ui.settings_bar import SettingsBar
 from data_manager import DataManager
 from AI_manager import AIManager
 
@@ -360,38 +359,18 @@ class AIProfessorUI(QMainWindow):
             }
         """)
         
-        # 工具栏布局
+        # 创建设置栏
+        self.settings_bar = SettingsBar()
+        
+        # 连接信号
+        self.settings_bar.tts_toggled.connect(self._on_tts_toggle)
+        self.settings_bar.language_toggled.connect(self.toggle_language)
+        self.settings_bar.md_processor_toggled.connect(self._on_md_processor_toggle)
+        
+        # 添加设置栏到工具栏
         toolbar_layout = QHBoxLayout(toolbar)
-        toolbar_layout.setContentsMargins(15, 0, 15, 0)
-        
-        # 工具栏标题
-        title_font = QFont("Source Han Sans SC", 11, QFont.Weight.Bold)
-        doc_title = QLabel("论文阅读")
-        doc_title.setFont(title_font)
-        doc_title.setStyleSheet("color: white; font-weight: bold;")
-        
-        # 语言切换按钮
-        self.lang_button = QPushButton("切换为英文")
-        self.lang_button.setObjectName("langButton")
-        self.lang_button.setStyleSheet("""
-            #langButton {
-                background-color: rgba(255, 255, 255, 0.2);
-                color: white;
-                border: 1px solid rgba(255, 255, 255, 0.3);
-                border-radius: 8px;
-                padding: 5px 15px;
-                font-weight: bold;
-            }
-            #langButton:hover {
-                background-color: rgba(255, 255, 255, 0.3);
-            }
-        """)
-        self.lang_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.lang_button.clicked.connect(self.toggle_language)
-        
-        # 添加到布局
-        toolbar_layout.addWidget(doc_title, 0, Qt.AlignmentFlag.AlignLeft)
-        toolbar_layout.addWidget(self.lang_button, 0, Qt.AlignmentFlag.AlignRight)
+        toolbar_layout.setContentsMargins(0, 0, 0, 0)
+        toolbar_layout.addWidget(self.settings_bar)
         
         return toolbar
 
@@ -487,20 +466,7 @@ class AIProfessorUI(QMainWindow):
         self.md_view.set_language("zh")  # 默认显示中文
         
         # 更新语言按钮文本
-        self.lang_button.setText("切换为英文")
-        self.lang_button.setStyleSheet("""
-            #langButton {
-                background-color: rgba(255, 255, 255, 0.2);
-                color: white;
-                border: 1px solid rgba(255, 255, 255, 0.3);
-                border-radius: 8px;
-                padding: 5px 15px;
-                font-weight: bold;
-            }
-            #langButton:hover {
-                background-color: rgba(255, 255, 255, 0.3);
-            }
-        """)
+        self.settings_bar.update_language_button(zh_content is not None)
         
         # 更新状态栏
         title = paper.get('translated_title', '') or paper.get('title', '')
@@ -563,39 +529,8 @@ class AIProfessorUI(QMainWindow):
         """
         lang = self.md_view.toggle_language()
         
-        # 设置按钮文本和样式
-        if lang == "zh":
-            btn_text = "切换为英文"
-            self.lang_button.setStyleSheet("""
-                #langButton {
-                    background-color: rgba(255, 255, 255, 0.2);
-                    color: white;
-                    border: 1px solid rgba(255, 255, 255, 0.3);
-                    border-radius: 8px;
-                    padding: 5px 15px;
-                    font-weight: bold;
-                }
-                #langButton:hover {
-                    background-color: rgba(255, 255, 255, 0.3);
-                }
-            """)
-        else:
-            btn_text = "切换为中文"
-            self.lang_button.setStyleSheet("""
-                #langButton {
-                    background-color: rgba(65, 105, 225, 0.3);
-                    color: white;
-                    border: 1px solid rgba(255, 255, 255, 0.3);
-                    border-radius: 8px;
-                    padding: 5px 15px;
-                    font-weight: bold;
-                }
-                #langButton:hover {
-                    background-color: rgba(65, 105, 225, 0.4);
-                }
-            """)
-            
-        self.lang_button.setText(btn_text)
+        # 更新设置栏的语言按钮状态
+        self.settings_bar.update_language_button(lang == "zh")
         
         # 更新状态栏
         current_paper = self.data_manager.current_paper
@@ -659,3 +594,20 @@ class AIProfessorUI(QMainWindow):
         
         # 调用父类的closeEvent
         super().closeEvent(event)
+
+    def _on_tts_toggle(self, checked):
+        """处理TTS开关切换事件"""
+        if hasattr(self, 'ai_manager'):
+            self.ai_manager.set_tts_enabled(checked)
+            status = "启用" if checked else "禁用"
+            self.statusBar().showMessage(f"已{status}TTS语音功能")
+
+    def _on_md_processor_toggle(self, checked):
+        """处理Markdown处理器切换事件"""
+        # 使用data_manager来切换处理器类型
+        if hasattr(self, 'data_manager') and hasattr(self.data_manager, 'toggle_md_processor'):
+            is_slides = self.data_manager.toggle_md_processor(checked)
+            processor_type = "幻灯片处理器" if is_slides else "标准处理器"
+            self.statusBar().showMessage(f"已切换至{processor_type}")
+            # 更新UI状态
+            self.settings_bar.update_md_processor_status(is_slides)
